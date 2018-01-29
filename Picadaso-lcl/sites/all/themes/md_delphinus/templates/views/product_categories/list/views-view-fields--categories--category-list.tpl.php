@@ -1,0 +1,1 @@
+<li><a href="<?php print base_path() . drupal_get_path_alias('taxonomy/term/' . $fields['tid']->content) ?>"><?php print $fields['name']->content;?> <span class="count"><?php print $fields['name_1']->content;?></span></a></li>

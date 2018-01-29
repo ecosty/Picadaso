@@ -1,0 +1,367 @@
+<?php
+/*
+ * implements hook_menu
+ */
+function md_block_painter_menu() {
+  $items = array();  
+  $path = drupal_get_path('module', 'md_block_painter') . '/includes';
+  $items['admin/structure/block-painter'] = array(
+    'title'=>'Block Painter',
+    'description'=>'Build block',
+    'page callback' => '_md_block_painter_list',
+    'access arguments' => array('build-blocl-painter'),
+    'file' => 'functions.inc',
+    'file path' => $path
+  );
+  $items['admin/structure/block-painter/add'] = array(
+    'title'=>'Add Block Painter',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_md_block_painter_form'),
+    'access arguments' => array('build-blocl-painter'),
+    'file' => 'functions.inc',
+    'file path' => $path,
+    'type' => MENU_LOCAL_ACTION
+  );
+  $items['admin/structure/block-painter/edit/%'] = array(
+    'title'=>'Edit Block Painter',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_md_block_painter_form'),
+    'access arguments' => array('build-blocl-painter'),
+    'file' => 'functions.inc',
+    'file path' => $path,
+    'type' => MENU_LOCAL_ACTION,
+    'context' => MENU_CONTEXT_INLINE
+  );  
+  $items['admin/structure/block-painter/edit/%/build'] = array(
+    'title'=>'Build Block Painter',
+    'page callback' => '',
+    'access arguments' => array('build-blocl-painter'),
+    'file' => 'functions.inc',
+    'file path' => $path
+  );
+  $items['admin/structure/block-painter/delete/%'] = array(
+    'title'=>'Delete Block Painter',
+    'page callback' => '_md_block_painter_delete',
+    'access arguments' => array('build-blocl-painter'),
+    'file' => 'functions.inc',
+    'file path' => $path,
+    'type' => MENU_CALLBACK
+  );
+  $items['admin/awe-content/templates/block'] = array(
+    'title' => t('Block'),
+    'description' => t('Contains all block templates for AWEContent Builder'),
+    'page callback' => 'ac_templates_overview',
+    'page arguments' => array(3),
+    'access callback' => '_awecontent_check_permission',
+    'access arguments' => array(USE_PERM),
+    'file' => 'awecontent.admin.inc',
+    'file path' => drupal_get_path('module', 'awecontent') . '/includes',
+    'weight' => 1,
+    'type' => MENU_LOCAL_TASK
+  );
+  
+  $items['awe-content/template-layout/block'] = array(
+    'page callback' => 'ac_template_layout_block',
+    'page arguments' => array(2),
+    'access callback' => '_awecontent_check_permission',
+    'access arguments' => array(USE_PERM),
+    'file' => 'awecontent.admin.inc',
+    'file path' => drupal_get_path('module', 'awecontent') . '/includes',
+    'type' => MENU_CALLBACK
+  );
+  
+  return $items;  
+}
+
+function md_block_painter_form_alter(&$form, &$form_state, $form_id){
+  //dsm($form_id);
+}
+
+/*
+ * implement hook_block_info
+ */
+function md_block_painter_block_info(){
+  $blocks = array();
+  $block_list = db_select('block_painter', 'items')->fields('items')->orderBy('updated', 'desc')->orderBy('id', 'desc')->execute()->fetchAll();
+  foreach($block_list as $item){
+    $blocks['block_painter_'.$item->id] = array(
+      'info' => $item->name
+    );
+  }
+  
+  return $blocks;
+}
+
+/*
+ * implement hook_block_view
+ */
+function md_block_painter_block_view($delta = ''){
+  if(strpos($delta, 'block_painter_') !== FALSE && strpos(current_path(), 'awe-content/template-layout') === FALSE){
+    $delta_arr = explode('_', $delta);
+    $id = $delta_arr[count($delta_arr) - 1];
+    $item = db_select('block_painter', 'items')->fields('items')->condition('id',$id)->execute()->fetch();
+    // check exist block
+    if(empty($item))
+      return;
+    
+    $item->settings = drupal_json_decode($item->settings);
+    $item->nid = 'block-'.$item->id;
+    $build_data = drupal_json_decode($item->build_data);
+    
+    $block['subject'] = $item->name;    
+    if(module_exists('awecontent')){
+      $module_path = drupal_get_path('module', 'awecontent');
+      // add style
+      if (variable_get('ac_include_bootstrap', 1) == 1) {
+        drupal_add_css($module_path . '/css/bootstrap.css');
+      }      
+      drupal_add_css($module_path . '/css/awecontent-layout.css');
+      drupal_add_css($module_path . '/css/animate.min.css');
+      drupal_add_css($module_path . '/css/new-custom.css');
+      drupal_add_css($module_path . '/js/awecontent/lib/magnific/magnific-popup.css');
+      drupal_add_css($module_path . '/js/awecontent/lib/owl.carousel/owl.carousel.css');
+      drupal_add_css($module_path . '/js/awecontent/lib/owl.carousel/owl.theme.css');
+      drupal_add_css($module_path . '/js/awecontent/lib/owl.carousel/owl.transitions.css');
+
+      drupal_add_css($module_path . '/css/objects/accordion.css');
+      drupal_add_css($module_path . '/css/objects/image.css');
+      drupal_add_css($module_path . '/css/objects/gallery.css');
+      drupal_add_css($module_path . '/css/objects/slideshow.css');
+      drupal_add_css($module_path . '/css/objects/button.css');
+      drupal_add_css($module_path . '/css/objects/divider.css');
+      drupal_add_css($module_path . '/css/objects/flickr.css');
+      drupal_add_css($module_path . '/css/ac-icon.css');
+      drupal_add_css($module_path . '/css/objects/icon.css');
+      drupal_add_css($module_path . '/css/objects/table.css');
+      drupal_add_css($module_path . '/css/objects/tabs.css');
+      
+      // fix conflict module aweconten
+      $css_fix ='.container-block-painter .col-lg-make-row-true, .container-block-painter .col-md-make-row-true, .container-block-painter .col-sm-make-row-true, .container-block-painter .col-xs-make-row-true{clear:none;}';
+      drupal_add_css($css_fix, array('type'=>'inline'));
+      
+      if (module_exists('icon') && module_exists('fontello')) {
+        $bundles = icon_bundles();
+        foreach ($bundles as $type => $bundle) {
+          if ($bundle['provider'] == 'fontello') {
+            fontello_process_attached($bundle['name']);
+          }
+        }
+      }
+      // add google font default & private
+      $default_google_font = variable_get('ac_google_font', '');
+      if ($default_google_font) {
+        drupal_add_css($default_google_font);
+      }
+      if(isset($item->settings['font'])){
+        $private_google_font = $item->settings['font'];      
+        if ($private_google_font) {
+          drupal_add_css($private_google_font);
+        }
+      }
+      // add js
+      $js = "jQuery(function($){\$('body').addClass('awecontent-layout');});";
+      drupal_add_js($js,array('type'=>'inline'));
+      drupal_add_library('system', 'ui.tabs');
+      drupal_add_library('system', 'ui.accordion');
+      drupal_add_js(drupal_get_path('module', 'awecontent') . '/js/awecontent/lib/froogaloop.min.js');
+      drupal_add_js(drupal_get_path('module', 'awecontent') . '/js/awecontent/lib/magnific/magnific-popup.js');
+      drupal_add_js(drupal_get_path('module', 'awecontent') . '/js/awecontent/lib/jquery.parallax-fontend.js');
+      drupal_add_js('https://www.youtube.com/iframe_api', 'external');
+      //drupal_add_js('https://maps.googleapis.com/maps/api/js?v=3.exp');
+      drupal_add_js($module_path . '/js/awecontent/lib/owl.carousel/owl.carousel.js');
+      drupal_add_js($module_path . '/js/awe-frontend-scripts.js');
+    
+      // render content      
+      $block['content'] = _awe_preprocess_data($build_data,$item);
+      $block['content']['#contextual_links']['edit_link'] = array('admin/structure/block-painter/edit/'.$id, array('md_block_painter'));
+    }
+    return $block;
+  }
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function md_block_painter_block_configure($delta = '') {
+  $form = array();
+  
+  if(strpos($delta, 'block_painter_') !== FALSE){
+    $delta_arr = explode('_', $delta);
+    $id = $delta_arr[count($delta_arr) - 1];
+    $form['edit_link_block'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div style="margin-bottom:20px;"><a href="'.url('admin/structure/block-painter/edit/'.$id, array('absolute'=>true)).'">Edit Block Painter</a></div>',
+    );
+  }
+  return $form;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function md_block_painter_permission() {
+  return array(
+    'build-blocl-painter' => array(
+      'title' => t('Block Painter'),
+      'description' => t('Build block')
+    )
+  );
+}
+
+/**
+ * Implements hook_library_alter().
+ */
+function md_block_painter_library_alter(&$libraries, $module) {
+  $path = drupal_get_path('module', 'awecontent');
+  $type = 'block';
+  $add_node_condition = strpos(current_path(), 'block-painter/add') !== FALSE; 
+  $edit_node_condition = (arg(2) == 'block-painter' && is_numeric(arg(4)) && arg(3) == 'edit');
+//  $view_layout_mode = (isset($_GET['ac_layout']) && $_GET['ac_layout']);
+//  $template_page = strpos(current_path(), 'awe-content/template-layout') !== FALSE || strpos(current_path(), 'awe-content/templates') !== FALSE;
+
+
+  if ($add_node_condition || $edit_node_condition) {
+    if ($module == 'system') {
+      $libraries['jquery']['version'] = '1.10.2';
+      $libraries['jquery']['js'] = array(
+        'misc/jquery.js' => array(
+          'group' => -100,
+          'weight' => -20,
+          'data' => "{$path}/js/awecontent/lib/jquery/jquery.min.js"
+        ),
+        'misc/jquery-migrate.js' => array(
+          'group' => -100,
+          'weight' => -19,
+          'data' => "{$path}/js/awecontent/lib/jquery-migrate-1.2.1.min.js",
+        )
+      );
+
+      // replace jquery ui
+      foreach ($libraries as $name => &$library) {
+        if (strpos($name, 'ui.') !== FALSE || strpos($name, 'effects') !== FALSE)
+          $library['js'] = array();
+      }
+      $ui_path = "{$path}/js/awecontent/lib/jquery-ui.min.js";
+      $libraries['ui']['js'] = array(
+        $ui_path => array(
+          'group' => -100,
+          'weight' => -1,
+          'data' => $ui_path
+        )
+      );
+      $libraries['ui']['version'] = '1.10.2';
+      $libraries['jquery.form']['js']['misc/jquery.form.js'] = array('data' =>  "{$path}/js/awecontent/lib/jquery.form.min.js");
+    }
+  }
+}
+
+/**
+ * implements hook_preprocess_html()
+ * @param $vars
+ */
+function md_block_painter_preprocess_html(&$vars) { //dsm($_GET['ac_layout']);
+  if (strpos(current_path(), 'awe-content/template-layout/block') !== FALSE) {
+    if (isset($_GET['ac_layout']) && $_GET['ac_layout']) {
+      $vars['awecontent'] = TRUE;
+
+      // Add theme suggestion to support separation template for page what is created by AWEContent Builder
+      $theme_suggestions = array('html__ac');
+      foreach ($vars['theme_hook_suggestions'] as $theme_suggestion) {
+        $theme_suggestions[] = $theme_suggestion;
+        $theme_suggestions[] = str_replace('html__', 'html__ac__', $theme_suggestion);
+      }
+
+      $vars['theme_hook_suggestions'] = $theme_suggestions;
+
+      // Add class to body
+      $vars['classes_array'][] = 'awecontent-layout';
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_page().
+ */
+function md_block_painter_preprocess_page(&$vars) {
+  //$router = _menu_find_router_path(current_path());
+  if (strpos(current_path(), 'awe-content/template-layout/block') !== FALSE) {
+    $vars['theme_hook_suggestions'][] = 'block_build_content';
+  }
+}
+
+/**
+ * Implements hook_them().
+ */
+function md_block_painter_theme($existing, $type, $theme, $path) {
+    $themes = array(); 
+    $base_path = drupal_get_path('module', 'md_block_painter');
+    $template_path =  $base_path. '/templates';
+    $themes['block_build_content'] = array(
+      'template' => 'page--block--content',
+      'path' => $template_path,
+      'variables'=>array(),
+    );
+    
+    
+    $themes['ac_manage_templates'] = array(
+      'template' => 'ac-template-list',
+      'variables' => array(
+        'type' => 'block',
+        'templates' => array(),
+        'load_more' => FALSE
+      ),
+      'path' => $template_path,
+      //'file' => 'theme.inc'
+    );
+    
+    return $themes;
+}
+
+/*
+ * function callback
+ */
+function ac_template_layout_block(){
+  if(module_exists('awecontent')){
+    // load libraries is used in page build
+    ac_layout_libraries_load();
+    return '';
+  }
+}
+function md_block_painter_preprocess_awecontent_section(&$vars){
+  if(isset($vars['node']->nid) && substr($vars['node']->nid, 0, 5) == 'block'){
+    $vars['fluid'] = 'container-fluid container-block-painter';
+  }
+}
+
+/*
+ * hook preprocess
+ */
+function md_block_painter_preprocess_ac_panel_font(&$vars) {
+  $vars['google_font'] = '';
+  if (isset($vars['path'])) {
+    $node_type = '';
+    $path = explode('/', trim($vars['path'], '/'));
+
+    if (strpos($vars['path'], '/node/add') !== FALSE)
+      $node_type = $path[count($path)-1];
+    else {
+      $node = node_load($path[count($path)-2]);
+      if ($node)
+        $node_type = $node->type;
+    }
+    
+    $private_font = $vars['font'];
+    $google_font = variable_get('ac_google_font', '');
+    if ($node_type && variable_get("ac_{$node_type}_google_font", ''))
+      $google_font = variable_get("ac_{$node_type}_google_font", '');
+    
+    if(empty($google_font) && !empty($private_font))
+      $google_font = $private_font;
+    else if(!empty($google_font) && !empty($private_font)){
+      $private_font = explode('family=', $private_font);
+      if(isset($private_font[1]) && $private_font[1] !== '')
+        $google_font .= '|'.$private_font[1];
+    }
+    $vars['google_font'] = $google_font;
+  }
+}

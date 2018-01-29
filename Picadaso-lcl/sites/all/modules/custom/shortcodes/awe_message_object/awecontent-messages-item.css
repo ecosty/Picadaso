@@ -1,0 +1,30 @@
+.alert .desc {
+	font-size: 16px;
+}
+.style-1 .alert.alert-normal {
+    background: #ececec;
+}
+.style-1 .alert.alert-info {
+    background: #f9b5aa;
+}
+.style-1 .alert.alert-success {
+    background: #e7f6cd;
+}
+.style-1 .alert.alert-warning {
+	background: #faf4d4;
+}
+.style-1 .alert.alert-danger {
+	background: #252932;
+}
+.style-2 .alert {
+    background: none !important;
+}
+.style-2 .alert.alert-danger {
+    color: #818d9a;
+}
+.style-2 .alert.alert-danger .alert_title {
+    color: #6c7884;
+}
+.style-2 .alert.alert-danger button.close {
+    color: #f56048;
+}

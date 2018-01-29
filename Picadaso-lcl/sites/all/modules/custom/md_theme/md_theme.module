@@ -1,0 +1,405 @@
+<?php
+
+function md_theme_theme($existing, $type, $theme, $path) {
+  return array(
+    'footer' => array(
+      'variables' => array(),
+      'template' => '/templates/social',
+    ),
+    'header' => array(
+      'variables' => array(),
+      'template' => '/templates/header',
+    ),
+    'breadcrumbs' => array(
+      'variables' => array(),
+      'template' => '/templates/breadcrumbs',
+    ),
+    'breadcrumbs_2' => array(
+      'variables' => array(),
+      'template' => '/templates/breadcrumbs_2',
+    ),
+    'header_1' => array(
+      'variables' => array(),
+      'template' => '/templates/header_1',
+    ),
+    'header_2' => array(
+      'variables' => array(),
+      'template' => '/templates/header_2',
+    ),
+    'header_3' => array(
+      'variables' => array(),
+      'template' => '/templates/header_3',
+    ),
+    'product_filter_price' => array(
+      'variables' => array(),
+      'template' => '/templates/product_filter_price',
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function md_theme_block_info() {
+  $blocks['footer'] = array(
+    'info' => t('Footer Social'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['header'] = array(
+    'info' => t('Header 4'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['breadcrumbs'] = array(
+    'info' => t('Breadcrumbs'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['breadcrumbs_2'] = array(
+    'info' => t('Breadcrumbs Style 2'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['header_1'] = array(
+    'info' => t('Header 1'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['header_2'] = array(
+    'info' => t('Header 2'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['header_3'] = array(
+    'info' => t('Header 3'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['product_filter_price'] = array(
+    'info' => t('Product filter by price'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  return $blocks;
+}
+
+function md_theme_preprocess_footer(&$vars) {
+  $social = variable_get('icon_footer', '');
+  if($social != ''){
+    $social_array = explode(',', $social);
+    $social_array = array_chunk($social_array, 3);
+    $vars['social'] = $social_array;
+  }
+}
+
+/**
+ * Implements hook_block_configure().
+ * @param string $delta
+ */
+function md_theme_block_configure($delta = '') {
+  switch ($delta) {
+    case 'footer':
+      $icon_bundles = icon_bundles();
+      $icons = array();
+      foreach ($icon_bundles as $bundles) {
+        $icons[] = md_icon_bundle_list($bundles);
+      }
+      $markup = '<ul id="sortable">
+                  <li class="icon-sort">
+                    <div class="toolbar">
+                        <a class="delete-icon" href="#">Delete</a>
+                        <a class="clone-icon" href="#">Clone</a>
+                    </div>
+                    <div class="wrap-icon">
+
+                    </div>
+                  </li>
+                </ul>';
+      $form_popup = '<div class="form-popup">
+                        <ul >
+                          <li><div class="choose-icon">Choose Icon<a href="#"><i class=""></i></a></div></li>
+                          <li><label>Enter Links</label><input class="form-text icon-link" type="text" name="link-icon" value="" /></li>
+                        </ul>
+                      </div>';
+      $form['#attached']['library'] = array(
+        array('system', 'ui.dialog'),
+        array('system', 'ui.sortable'),
+      );
+      $form['#attached']['js'] = array(
+        drupal_get_path('module', 'md_theme') . '/js/social.js'
+      );
+      $form['#attached']['css'] = array(
+        drupal_get_path('module', 'md_theme') . '/css/module-style.css'
+      );
+      $form['footer_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Footer settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+      );
+      $form['footer_settings']['icon_footer'] = array(
+        '#type' => 'hidden',
+        '#default_value' => variable_get('icon_footer', ''),
+        '#attributes' => array(
+          'class' => array('icon-footer')
+        )
+      );
+      $form['footer_settings']['popup_form'] = array(
+        '#type' => 'markup',
+        '#markup' => $form_popup
+      );
+      $form['footer_settings']['popup_icon'] = array(
+        '#type' => 'markup',
+        '#markup' => '<div class="icon-popup">' . drupal_render($icons) . '</div>',
+      );
+      $form['footer_settings']['markup_icon'] = array(
+        '#type' => 'markup',
+        '#markup' => '<div class="list-icon">' . $markup . '</div>',
+      );
+
+      return $form;
+      break;
+
+    case 'product_filter_price':
+      $form['min_price'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Min price'),
+        '#default_value' => variable_get('product_filter_min_price', 0),
+        '#element_validate' => array('element_validate_number'),
+      );
+      $form['max_price'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Max price'),
+        '#default_value' => variable_get('product_filter_max_price', 1000),
+        '#element_validate' => array('element_validate_number')
+      );
+      return $form;
+      break;
+  }
+}
+
+
+
+/**
+ * Implements hook_block_save().
+ */
+function md_theme_block_save($delta = '', $edit = array()) {
+  switch ($delta) {
+    case 'footer':
+      variable_set('icon_footer', $edit['icon_footer']);
+      break;
+    case 'product_filter_price':
+      variable_set('product_filter_min_price', $edit['min_price']);
+      variable_set('product_filter_max_price', $edit['max_price']);
+      break;
+  }
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function md_theme_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'footer':
+      md_icon_load();
+      $block['content'] = theme('footer', array('config' => NULL));
+      break;
+    case 'header':
+      $block['content'] = theme('header', array('config' => NULL));
+      break;
+    case 'breadcrumbs':
+      $block['content'] = theme('breadcrumbs', array('config' => NULL));
+      break;
+    case 'breadcrumbs_2':
+      $block['content'] = theme('breadcrumbs_2', array('config' => NULL));
+      break;
+    case 'header_1':
+      $block['content'] = theme('header_1', array('config' => NULL));
+      break;
+    case 'header_2':
+      $block['content'] = theme('header_2', array('config' => NULL));
+      break;
+    case 'header_3':
+      $block['content'] = theme('header_3', array('config' => NULL));
+      break;
+    case 'product_filter_price':
+      $block['content'] = theme('product_filter_price');
+      break;
+
+  }
+  return $block;
+}
+
+function md_icon_load() {
+  $items = icon_bundles();
+  $md_prtb_output = '';
+  //dsm($items);
+  foreach($items as $bundle => $icons) {
+    if(($icons['settings'] !=  null ) && ($icons['settings']['tag'] ==  'i' )) {
+      foreach($icons['icons'] as $icon_value => $icon_name) {
+        //$md_prtb_icon_temp = theme('icon',array('attribute' => '','icon' => $icon_value, 'bundle' => $bundle));
+        //$md_prtb_output .= '<option value="'.$icon_value.'|'.$bundle.'">'.$icon_name.'</option>';
+        $md_prtb_output .= theme('icon',array('attributes' => array('class' => array('js-body-selector-icon')),'icon' => $icon_value, 'bundle' => $bundle));
+      }
+    }
+  }
+  return t($md_prtb_output);
+}
+
+/**
+ * Implement hook_awecontent_block_support()
+ * @param string $delta
+ * @param string $module
+ * @return array
+ */
+function md_theme_awecontent_block_support($delta = '', $module = '') {
+  global  $base_url;
+  $output = array();
+  $path_theme = $base_url . '/' . drupal_get_path('theme', 'md_delphinus');
+  // process for block of views module
+  $css = array();
+  $js = array();
+
+  $js[] = $path_theme . '/js/front/plugins.js';
+  $js[] = $path_theme . '/js/front/main.js';
+
+  $output = array('css' => $css, 'js' => $js);
+  return $output;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function md_theme_form_menu_edit_item_alter(&$form, &$form_state, $form_id) {
+  global $base_url;
+
+  if (isset($form_state['build_info']['args'][0]) && $form_state['build_info']['args'][0] == 'add') {
+    if (!isset($form_state['build_info']['args'][2]['menu_name']) || $form_state['build_info']['args'][2]['menu_name'] != 'main-menu') {
+      return;
+    }
+  }
+  if (isset($form_state['build_info']['args'][0]) && $form_state['build_info']['args'][0] == 'edit') {
+    if (!isset($form_state['build_info']['args'][1]['menu_name']) || $form_state['build_info']['args'][1]['menu_name'] != 'main-menu') {
+      return;
+    }
+  }
+  
+  $value = $layout = $layout_col = '';
+  if ($form['mlid']['#value'] != 0) {
+    $layout = variable_get('md_theme_layout_' . $form['mlid']['#value'], '');
+    $layout_col = variable_get('md_theme_layout_col_' . $form['mlid']['#value'], '');
+  }
+  $form['layout'] = array(
+    '#title' => 'Choose Menu Style',
+    '#type' => 'select',
+    '#options'  => array(
+        'menu-list'         => 'List',
+        'menu-col'          => 'Columns'
+    ),
+    '#weight' => 1,
+    '#default_value' => $layout,
+    '#states'   => array(
+        // Hide the logo settings when using the default logo.
+        'visible' => array(
+            ':input[name="parent"]' => array(
+                array('value' => 'main-menu:0'),
+            ),
+        ),
+    ),
+  );
+  $form['layout_col'] = array(
+    '#title'  => 'Choose Number of Columns',
+    '#type'   => 'select',
+    '#options'    => array(
+        '2'       => '2',
+        '3'       => '3',
+        '4'       => '4',
+        '5'       => '5'
+    ),
+    '#weight' => 2,
+    '#default_value' => $layout_col,
+    '#states'   => array(
+        // Hide the logo settings when using the default logo.
+        'visible' => array(
+            ':input[name="layout"]' => array(
+                array('value' => 'menu-col')
+            ),
+        ),
+    ),
+  );
+  $form['link_title']['#weight'] = -2;
+  $form['#submit'][] = 'md_theme_form_menu_edit_submit';
+}
+
+/**
+ * Store class to drupal variable.
+ */
+function md_theme_form_menu_edit_submit($form, $form_state) {
+  variable_set('md_theme_layout_' . $form_state['values']['mlid'], $form_state['values']['layout']);
+  variable_set('md_theme_layout_col_' . $form_state['values']['mlid'], $form_state['values']['layout_col']);
+}
+
+/**
+ * @see theme_menu_link(&$vars).
+ */
+function md_theme_preprocess_menu_link(&$vars) {
+  $element = &$vars['element'];
+  if ($element['#original_link']['menu_name'] == 'main-menu') {
+    $layout = variable_get('md_theme_layout_' . $element['#original_link']['mlid'], '');
+    $element['#attributes']['layout'][] = $layout;
+    $layout_col = variable_get('md_theme_layout_col_' . $element['#original_link']['mlid'], '');
+    $element['#attributes']['layout_col'][] = $layout_col;
+  }
+}
+
+/**
+ * Implements hook_commerce_currency_info_alter().
+ *
+ */
+function md_theme_commerce_currency_info_alter(&$currencies, $langcode) {
+  foreach ($currencies as $currency_code => &$currency_info) {
+    $currency_info['symbol_placement'] = 'before';
+  }
+}
+
+
+
+function md_theme_preprocess_views_view(&$vars) {
+  $view = $vars['view'];
+  if ($view->name == 'product' & $view->current_display == 'product_2_cols') {
+    $query = drupal_get_query_parameters();
+    $values = array(
+      'baseUrl'             => $GLOBALS['base_url'] . '/' . current_path(),
+      'query'             => (object) $query,
+      'min_price'           => (int) variable_get('product_filter_min_price', 0),
+      'max_price'           => (int) variable_get('product_filter_max_price', 1000),
+      'current_min_price'   => (int) isset($query['min-price']) ? $query['min-price'] : (int) variable_get('product_filter_min_price', 0),
+      'current_max_price'   => (int) isset($query['max-price']) ? $query['max-price'] : (int) variable_get('product_filter_max_price', 1000),
+    );
+    drupal_add_js(array('md_delphinus' => $values), 'setting');
+    drupal_add_js(drupal_get_path('module', 'md_theme') . '/js/product-2-col.js');
+  }
+
+  if ($view->name == 'product' & $view->current_display == 'product_3_cols') {
+    $query = drupal_get_query_parameters();
+    $values = array(
+      'baseUrl'             => $GLOBALS['base_url'] . '/' . current_path(),
+      'query'             => (object) $query,
+      'min_price'           => (int) variable_get('product_filter_min_price', 0),
+      'max_price'           => (int) variable_get('product_filter_max_price', 1000),
+      'current_min_price'   => (int) isset($query['min-price']) ? $query['min-price'] : (int) variable_get('product_filter_min_price', 0),
+      'current_max_price'   => (int) isset($query['max-price']) ? $query['max-price'] : (int) variable_get('product_filter_max_price', 1000),
+    );
+    drupal_add_js(array('md_delphinus' => $values), 'setting');
+    drupal_add_js(drupal_get_path('module', 'md_theme') . '/js/product-2-col.js');
+  }
+
+  if ($view->name == 'product' & $view->current_display == 'product_4_cols') {
+    $query = drupal_get_query_parameters();
+    $values = array(
+      'baseUrl'             => $GLOBALS['base_url'] . '/' . current_path(),
+      'query'             => (object) $query,
+      'min_price'           => (int) variable_get('product_filter_min_price', 0),
+      'max_price'           => (int) variable_get('product_filter_max_price', 1000),
+      'current_min_price'   => (int) isset($query['min-price']) ? $query['min-price'] : (int) variable_get('product_filter_min_price', 0),
+      'current_max_price'   => (int) isset($query['max-price']) ? $query['max-price'] : (int) variable_get('product_filter_max_price', 1000),
+    );
+    drupal_add_js(array('md_delphinus' => $values), 'setting');
+    drupal_add_js(drupal_get_path('module', 'md_theme') . '/js/product-2-col.js');
+  }
+}

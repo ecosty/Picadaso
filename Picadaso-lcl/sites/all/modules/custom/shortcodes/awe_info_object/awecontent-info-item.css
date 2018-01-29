@@ -1,0 +1,32 @@
+#info-panel.awe-obj-panel.panel-info {
+	width: 350px;
+}
+#info-panel.panel-info .obj-adjust {
+	width: 290px;
+}
+.uppercase {
+	text-transform: uppercase;
+}
+.lowercase {
+	text-transform: lowercase;
+}
+.capitalize {
+	text-transform: capitalize;
+}
+.awe-cover-box {
+	width: 100%;
+}
+.awe-cover-box .block-interactive-banner {
+	width: 50%;
+    display: inline-block;
+    float: left;
+    padding-right: 3%;
+}
+.awe-cover-box .overlay-container {
+	overflow: hidden;
+}
+.awe-cover-box .cover-box-content {
+	position: static !important;
+	width: auto;
+	display: inline-block;
+}

@@ -1,0 +1,16 @@
+.dropcap-bg .kt_dropcap.dropcap-sm {
+    font-size: 30px;
+    line-height: 40px;
+    height: 40px;
+	padding: 0 10px;
+    margin-top: 10px;
+}
+.dropcap-circle .kt_dropcap.dropcap-sm {
+    font-size: 30px;
+    line-height: 40px;
+    height: 40px;
+	width: 40px;
+	padding: 0 10px;
+    margin-top: 10px;
+	border-radius: 100%;
+}

@@ -1,0 +1,81 @@
+<?php
+/**
+ * Implement hook_schema()
+ */
+function md_block_painter_schema() {
+  return array(
+    'block_painter' => array(
+      'description' => 'This table contains data of block what created by Awecontent Builder',
+      'fields' => array(
+        'id' => array(
+          'type' => 'serial',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+          'size' => 'big'
+        ),
+        'name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE
+        ),
+        'description' => array(
+          'type' => 'varchar',
+          'length' => 1000,
+          'not null' => TRUE
+        ),
+        'build_data' => array(
+          'type' => 'text',
+          'size' => 'big',
+          'not null' => FALSE
+        ),
+        'settings' => array(
+          'type' => 'text',
+          'not null' => FALSE
+        ),
+        'status' => array(
+          'type' => 'int',
+          'size' => 'tiny',
+          'not null' => TRUE,
+          'unsigned' => TRUE,
+          'default' => 0
+        ),   
+        'created' => array(
+          'type' => 'int',
+          'size' => 'big',
+          'not null' => TRUE,
+          'unsigned' => TRUE,
+          'default' => 0
+        ),
+        'updated' => array(
+          'type' => 'int',
+          'size' => 'big',
+          'not null' => FALSE,
+          'unsigned' => TRUE
+        ),
+      ),
+      'primary key' => array('id'),
+      'indexes' => array(
+        'ac_id' => array('id')
+      )
+    )
+  );
+}
+
+
+/**
+ * implements hook_install()
+ */
+function md_block_painter_install() {
+  //Disable module overlay
+  db_update('system')
+    ->fields(array('status' => 0))
+    ->condition('name', 'overlay')
+    ->condition('type', 'module')
+    ->execute();
+
+  //Set weight module awemenu_generate
+  db_update('system')
+    ->fields(array('weight' => 999))
+    ->condition('name', 'md_block_painter', '=')
+    ->execute();
+}

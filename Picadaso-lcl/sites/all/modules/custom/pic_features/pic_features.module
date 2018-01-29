@@ -1,0 +1,324 @@
+<?php
+
+use Facebook\FacebookSession;
+use Facebook\FacebookRedirectLoginHelper;
+use Facebook\FacebookSDKException;
+use Facebook\FacebookRequest;
+use Facebook\FacebookRequestException;
+
+
+/**
+ * This hook allows other modules to add permissions to $scope array
+ *
+ * $scope[] = 'email' is added automatically by simple_fb_connect
+ * Please note that if your app requires some additional permissions, you may
+ * have to submit your Facebook App to Facebook Review process
+ *
+ * Read more about FB review process:
+ * https://developers.facebook.com/docs/apps/review/login
+ *
+ * @param $scope
+ *   The scope array listing the permissions requested by the app
+ *
+ * @return
+ *   The updated scope array
+ */
+function pic_features_simple_fb_connect_scope_info($scope) {
+  // Implement this hook in your own module to add items to $scope array
+
+  $scope[] = 'user_birthday';
+
+  return $scope;
+}
+
+/**
+ * This hook allows other modules to act on user creation via Facebook login.
+ *
+ * There is also a Rules event triggered that can be used to react
+ * on user creation via Simple FB Connect.
+ *
+ * The example code shows how to make an additional query to Facebook API in
+ * order to request user's first and last name and how to map these to
+ * corresponding Drupal user fields.
+ *
+ * This example assumes that you have added fields "field_first_name" and
+ * "field_last_name" to User entity at admin/config/people/accounts/fields and
+ * that the length of these text fields is 255 characters.
+ *
+ * List of User fields on Facebook:
+ * https://developers.facebook.com/docs/graph-api/reference/user
+ *
+ * @param $drupal_user
+ *   Drupal user that was just created via Simple FB Connect.
+ */
+function pic_features_simple_fb_connect_registration($drupal_user) {
+  // Implement this hook in your own module to act on user creation.
+  // The code here is just an example.
+
+  // Get FacebookSession for current user.
+  $fb_session = simple_fb_connect_get_session();
+
+  // Get API version from Simple FB Connect settings.
+  $api_version = simple_fb_connect_get_api_version();
+
+  // Try to read first and last name from Facebook API.
+  try {
+    $request = new FacebookRequest(
+      $fb_session,
+      'GET',
+      '/me',
+      array('fields' => 'first_name,last_name,birthday'),
+      $api_version
+    );
+    $object = $request->execute()->getGraphObject();
+
+    // Truncate Facebook values to 255 characters.
+    $first_name = substr($object->getProperty('first_name'), 0, 255);
+    $last_name = substr($object->getProperty('last_name'), 0, 255);
+    $birthday = substr($object->getProperty('birthday'), 0, 255);
+
+    // Save Facebook valuest to Drupal user
+    $drupal_user->field_first_name[LANGUAGE_NONE][0]['value'] = $first_name;
+    $drupal_user->field_last_name[LANGUAGE_NONE][0]['value'] = $last_name;
+    $drupal_user->field_birth_date[LANGUAGE_NONE][0]['value'] = $birthday;
+
+    //Generate the coupon code for the first order...
+    generate_coupon_code($drupal_user->uid);
+
+    //Set the Referral User Code tu false
+    $drupal_user->field_referral_code_created[LANGUAGE_NONE][0]['value'] = 0;
+
+    //Add referal code if it exists
+    if(isset($_SESSION['referral_code'])){
+      $drupal_user->field_referral_code[LANGUAGE_NONE][0]['value'] = $_SESSION['referral_code'];
+    }
+
+    //Add phone number if it exists
+    if(isset($_COOKIE['userphone'])){
+      $drupal_user->field_user_phone_number[LANGUAGE_NONE][0]['value'] = $_COOKIE['userphone'];
+    }
+
+    // Save the user.
+    user_save($drupal_user);
+  }
+  catch (FacebookRequestException $ex) {
+    watchdog(
+      'Picaso Features',
+      'Could not load fields from Facebook: FacebookRequestException. Error details: @message',
+      array('@message' => json_encode($ex->getResponse())),
+      WATCHDOG_ERROR
+    );
+  }
+  catch (\Exception $ex) {
+    watchdog(
+      'Picaso Features',
+      'Could not load fields from Facebook: Unhandled exception. Error details: @message',
+      array('@message' => $ex->getMessage()),
+      WATCHDOG_ERROR
+    );
+  }
+}
+
+/* Alter a form just before it is displayed */
+function pic_features_form_alter(&$form, &$form_state, $form_id) {
+
+    global $user;
+
+    /* Checkout form */
+    if( $form_id == 'commerce_checkout_form_checkout' && user_is_logged_in() ){
+
+      /* Rename some labels in the Checkout form */
+      $form['customer_profile_billing']['#title'] = 'Información de la factura';
+      $form['customer_profile_shipping']['#title'] = 'Información de entrega';
+      $form['customer_profile_billing']['field_phone_number']['und'][0]['value']['#title'] = 'Número de teléfono';
+      $form['customer_profile_shipping']['field_shipping_phone_number']['und'][0]['value']['#title'] = 'Número de teléfono';
+
+      /* Prepopulate the Checkout form */
+      //Assign a coupon code if it's available.
+      $coupon_available =  pic_features_get_coupon_code($user->uid);
+      if($coupon_available != ''){
+        $form['commerce_coupon']['coupon_code']['#value'] = $coupon_available;
+        $form['commerce_coupon']['coupon_code']['#description'] = 'Existe un cupón disponible para tu compra. Si deseas aplicarlo presiona el botón';
+      }
+      else{
+        $form['commerce_coupon']['coupon_code']['#description'] = '';
+      }
+
+      $user = user_load( $user->uid );
+
+      // For each field in customer profile I fill the form field with the $user value
+      if (!empty($user->field_first_name)) {
+        $form['customer_profile_billing']['commerce_customer_address']['und'][0]['#address']['first_name']  = $user->field_first_name['und'][0]['value'];
+        $form['customer_profile_shipping']['commerce_customer_address']['und'][0]['#address']['first_name']  = $user->field_first_name['und'][0]['value'];
+      }
+
+      if (!empty($user->field_last_name)) {
+        $form['customer_profile_billing']['commerce_customer_address']['und'][0]['#address']['last_name']  = $user->field_last_name['und'][0]['value'];
+        $form['customer_profile_shipping']['commerce_customer_address']['und'][0]['#address']['last_name']  = $user->field_last_name['und'][0]['value'];
+      }
+
+      if (!empty($user->field_user_phone_number)) {
+        $form['customer_profile_billing']['field_phone_number']['und'][0]['value']['#default_value']  = $user->field_user_phone_number['und'][0]['value'];
+        $form['customer_profile_shipping']['field_shipping_phone_number']['und'][0]['value']['#default_value']  = $user->field_user_phone_number['und'][0]['value'];
+      }
+
+      if(isset($_COOKIE['picadasoAddress'])){
+        $addressArray = explode("#", $_COOKIE['picadasoAddress']);
+
+        $form['customer_profile_billing']['commerce_customer_address']['und'][0]['street_block']['thoroughfare']['#value'] = $addressArray[0];
+        $form['customer_profile_shipping']['commerce_customer_address']['und'][0]['street_block']['thoroughfare']['#value'] = $addressArray[0];
+
+        $form['customer_profile_billing']['field_gps_latitude']['und'][0]['value']['#default_value']  = $addressArray[1];
+        $form['customer_profile_shipping']['field_shipping_gps_latitude']['und'][0]['value']['#default_value']  = $addressArray[1];
+
+        $form['customer_profile_billing']['field_gps_longitude']['und'][0]['value']['#default_value']  = $addressArray[2];
+        $form['customer_profile_shipping']['field_shipping_gps_longitude']['und'][0]['value']['#default_value']  = $addressArray[2];
+      }
+
+      $form['customer_profile_billing']['commerce_customer_address']['und'][0]['#address']['locality']  = 'Quito';
+      $form['customer_profile_shipping']['commerce_customer_address']['und'][0]['#address']['locality']  = 'Quito';
+    }
+
+    if( $form_id == 'commerce_checkout_form_shipping' && user_is_logged_in() ){
+      $form['commerce_shipping']['shipping_service']['#options']['shipping_cost'] = str_replace("Shipping","Costo de envío",$form['commerce_shipping']['shipping_service']['#options']['shipping_cost']);
+    }
+
+    if( $form_id == 'commerce_checkout_form_review' && user_is_logged_in() ){
+      $form['checkout_review']['review']['#data']['commerce_giftwrap']['data'] = str_replace("Would you like your order gift wrapped","Envuelto para regalo: ",$form['checkout_review']['review']['#data']['commerce_giftwrap']['data']);
+    }
+
+    //Alter login form.
+    if ($form_id == 'user_login') {
+      $form['links'] = Null;        // Remove Request New Password and other links from Block form
+      $form['links']['#markup'] = ' <a href="/user/register">' . t('Crear cuenta') . '</a><br>' . ' <a href="/user/password">' . t('Olvidaste tu contraseña?') . '</a>'; // Remove Request New Password from Block form
+    }
+
+    //Alter login form.
+    if ($form_id == 'user_register_form') {
+      drupal_add_js(drupal_get_path('theme', 'md_delphinus') . '/js/front/libs/bootstrap-datepicker/js/bootstrap-datepicker.min.js');
+      drupal_add_css(drupal_get_path('theme', 'md_delphinus') . '/js/front/libs/bootstrap-datepicker/css/bootstrap-datepicker3.min.css');
+      $form['field_birth_date']['und'][0]['value']['#attributes']['readonly'] = 'readonly';
+    }
+}
+
+function pic_features_commerce_checkout_complete($order) {
+  $user = user_load( $GLOBALS['user']->uid );
+
+  //Check if user was referenced by another user and generate the code for the referral user.
+  if(isset($user->field_referral_code[LANGUAGE_NONE][0]['value'])){
+    //Decrypt referral user code and create the coupon.
+    $referralCode = pic_features_user_crypt( $user->field_referral_code[LANGUAGE_NONE][0]['value'], $action = 'd' );
+
+    $referral_user = user_load( $referralCode );
+
+    if($referral_user->field_referral_code_created[LANGUAGE_NONE][0]['value'] == 0){
+      generate_coupon_code($referralCode);
+      $referral_user->field_referral_code_created[LANGUAGE_NONE][0]['value'] = 1;
+      user_save($referral_user);
+    }
+  }
+}
+
+function pic_features_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+  if($router_item['path'] == 'user/%/edit' || $router_item['path'] == 'user/%/orders' || $router_item['path'] == 'user/%') {
+    unset($data['tabs'][0]);
+    unset($data['tabs'][1]);
+  }
+}
+
+function generate_coupon_code($user_id) {
+  $coupon = commerce_coupon_create('discount_coupon');
+  $coupon->code = commerce_coupon_generate_coupon_code(8);
+  $coupon->commerce_coupon_recipient[LANGUAGE_NONE][0]['target_id'] = $user_id;
+  $coupon->commerce_discount_reference[LANGUAGE_NONE][0]['target_id'] = 2;
+  $coupon->commerce_coupon_conditions[LANGUAGE_NONE][0] = array(
+     'condition_name' => 'commerce_coupon_usage_evaluate_usage',
+     'condition_settings' => array(
+     'max_usage' => 1
+      )
+  );
+  commerce_coupon_save($coupon);
+
+  return $coupon->code;
+}
+
+/**
+  * Encrypt and decrypt
+  * @param string $string string to be encrypted/decrypted
+  * @param string $action what to do with this? e for encrypt, d for decrypt
+  */
+  function pic_features_user_crypt( $string, $action = 'e' ) {
+    // you may change these values to your own
+    $secret_key = '6gtWy5b9';
+    $secret_iv = 'hGv8G3cB';
+
+    $output = false;
+    $encrypt_method = "AES-256-CBC";
+    $key = hash( 'sha256', $secret_key );
+    $iv = substr( hash( 'sha256', $secret_iv ), 0, 16 );
+
+    if( $action == 'e' ) {
+        $output = base64_encode( openssl_encrypt( $string, $encrypt_method, $key, 0, $iv ) );
+    }
+    else if( $action == 'd' ){
+        $output = openssl_decrypt( base64_decode( $string ), $encrypt_method, $key, 0, $iv );
+    }
+
+    return $output;
+  }
+
+  function pic_features_get_coupon_code($user_id) {
+    $coupons = views_get_view_result('coupons', 'coupon_list_per_user', $user_id);
+
+    foreach ($coupons as $coupon) {
+      $uses = commerce_coupon_usage_get_usage($coupon->coupon_id, FALSE);
+
+      if($uses < 1) {
+        return $coupon->commerce_coupon_code;
+      }
+    }
+
+    return '';
+  }
+
+  function pic_features_get_user_code() {
+
+      $userShareCode = '';
+
+      if(isset($GLOBALS['user'])){
+        $userShareCode = '?refcode=' . pic_features_user_crypt($GLOBALS['user']->uid);
+      }
+
+      echo $GLOBALS['base_url'] . $userShareCode;
+  }
+
+  /*Patch to modify the Order total label in cehckout */
+  function pic_features_commerce_price_formatted_components_alter(&$components, $price, $entity) {
+    $components['commerce_price_formatted_amount']['title'] = t('Total');
+    $components['flat_rate_shipping_cost']['title'] = t('Costo de Envío');
+  }
+
+  //Send to a javascript function if the user is logged in or not.
+  function pic_features_init()
+  {
+      global $user;
+      drupal_add_js(array('user_js_uid' => $user->uid), 'setting');
+  }
+
+  function pic_features_user_login(&$edit, $account){
+    //Add phone number if it exists
+    if(isset($_COOKIE['userphone'])){
+      $account->field_user_phone_number[LANGUAGE_NONE][0]['value'] = $_COOKIE['userphone'];
+    }
+
+    // Save the user.
+    user_save($account);
+  }
+
+
+  /*
+   * Implements hook_email_registration_name().
+  */
+  function pic_features_email_registration_name($edit, $account) {
+    return $account->field_first_name['und'][0]['value'] . ' ' . $account->field_last_name['und'][0]['value'];
+  }
